@@ -9,7 +9,7 @@
 #include <complex>
 #include <chrono>
 #include <omp.h>
-#include <intrin.h> 
+#include <immintrin.h> 
 using namespace std;
 
 // typedef complex<double> Complex;
@@ -17,8 +17,10 @@ typedef chrono::high_resolution_clock Clock;
 
 const int m=1638400;    // DO NOT CHANGE!!
 const int K=100000; // DO NOT CHANGE!!
+const int local_num = m/8;
 
 inline double logDataVSPrior(const double* dat_0, const double* dat_1,const double* pri_0, const double* pri_1, const double* ctf, const double* sigRcp, const int num, const double disturb0);
+inline double logDataVSPrior2(const double* dat_0, const double* dat_1,const double* pri_0, const double* pri_1, const double* ctf, const double* sigRcp, const int num, const double disturb0);
 
 int main ( int argc, char *argv[] )
 { 
@@ -94,8 +96,8 @@ int main ( int argc, char *argv[] )
 
 
     for(unsigned int t = 0; t < K; t++)
-    {
-        result = logDataVSPrior(dat, pri, ctf, sigRcp, m, disturb[t]);
+    {      
+        result = logDataVSPrior(dat_0, dat_1,pri_0, pri_1,ctf, sigRcp, m, disturb[t]);
         fout << t+1 << ": " << result <<"\n";
     }
     fout<<flush;
@@ -106,8 +108,11 @@ int main ( int argc, char *argv[] )
     auto compTime = chrono::duration_cast<chrono::microseconds>(endTime - startTime);
     cout << "Computing time=" << compTime.count() << " microseconds" << endl;
 
-    delete[] dat;
-    delete[] pri;
+    delete[] dat_0;
+    delete[] pri_0;
+
+    delete[] dat_1;
+    delete[] pri_1;
 
     delete[] ctf;
     delete[] sigRcp;
@@ -118,54 +123,49 @@ int main ( int argc, char *argv[] )
 inline double logDataVSPrior(const double* dat_0, const double* dat_1,const double* pri_0, const double* pri_1, const double* ctf, const double* sigRcp, const int num, const double disturb0)
 {
     double result = 0.0;
-    double temp;
-    int local_num = 65536;
-    #pragma omp parallel num_threads(25)
-    {
+    #pragma omp parallel num_threads(8)
+  
+{
+
+       
     int my_rank = omp_get_thread_num();
-    int thread_count = omp_get_num_threads();
-    int i,start,end，loop = local_num/8;
+    //int thread_count = omp_get_num_threads();
+    int i;
+    int start,end; 
     double my_result=0.0;
-    double local_dat_0[local_num],local_dat_1[local_num],local_pri_0[local_num],local_pri_1[local_num],local_ctf[local_num],local_sigRcp[local_num],local_my_result[local_num];
+    //double *local_my_result = new double[local_num];
+    double local_my_result[local_num];
 
-    __m521d m1, m2, m3, m4,m5,m6,m7;  
-    start = my_rank*local_num;
+    start = local_num*my_rank;
     end = start+local_num;
+    
+    
+    __m256d m_dat0, m_dat1, m_pri0, m_pri1,m_ctf,m_sigRcp,m1,m2,m3,m4,m5;  
 
-    //************************************
-    copy(dat_0+start,dat_0+end,local_dat_0);
-    cpoy(dat_1+start,dat_1+end,local_dat_1);
-    copy(pri_0+start,pri_0+end,local_pri_0);
-    copy(pri_1+start,pri_1+end,local_pri_1);
-    copy(ctf+start,ctf+end,local_ctf);
-    copy(sigRcp+start,sigRcp+end,local_sigRcp);
-    //************************************
+    for (i = start; i < end; i+=4)
+    {   
 
-    __m512d* p_local_dat_0 = (__m512d*)local_dat_0;
-    __m512d* p_local_dat_1 = (__m512d*)local_dat_1;
-    __m512d* p_local_pri_0 = (__m512d*)local_pri_0;
-    __m512d* p_local_pri_1 = (__m512d*)local_pri_1;
-    __m512d* p_local_ctf = (__m512d*)local_ctf;
-    __m512d* p_local_sigRcp = (__m512d*)local_sigRcp;
-    __m512d* p_local_my_reslt = (__m512d*)local_my_result;
-
-
-    for (i = 0; i < loop; i++)
-    {
+        m_dat0 = _mm256_loadu_pd(dat_0+i);
+        m_dat1 = _mm256_loadu_pd(dat_1+i);
+        m_pri0 = _mm256_loadu_pd(pri_0+i);
+        m_pri1 = _mm256_loadu_pd(pri_1+i);
+        m_ctf = _mm256_loadu_pd(ctf+i);
+        m_sigRcp = _mm256_loadu_pd(sigRcp+i);
 
             //my_result+= ( norm( dat[i] - ctf[i] * pri[i] ) * sigRcp[i] );
-        m1 = _mm512_mul_pd(*p_local_pri_0,*p_local_ctf);
-        m2 = _mm512_mul_pd(*p_local_pri_1,*p_local_ctf);
-        m3 = _mm512_sub_pd(*p_local_dat_0,m1);
-        m4 = _mm512_sub_pd(*p_local_dat_1,m2);
-        m5 = _mm512_mul_pd(m3,m3);
-        m6 = _mm512_mul_pd(m4,m4);
-        m7 = _mm512_add_pd(m5,m6);
-        *p_local_my_result = _mm_mul512_pd(m7,*p_local_sigRcp);
+        m1 = _mm256_mul_pd(m_pri0,m_ctf);
+        m2 = _mm256_mul_pd(m_pri1,m_ctf);
+        m1 = _mm256_sub_pd(m_dat0,m1);
+        m2 = _mm256_sub_pd(m_dat1,m2);
+        m3 = _mm256_mul_pd(m1,m1);
+        m4 = _mm256_mul_pd(m2,m2);
+        m3 = _mm256_add_pd(m3,m4);
+        m5 = _mm256_mul_pd(m3,m_sigRcp);
+        _mm256_storeu_pd(local_my_result+(i%local_num),m5);
    
     }
 
-    local_my_result = (double*) p_local_my_result;
+
 
 
     for(i=0;i<local_num;i++){
@@ -175,6 +175,34 @@ inline double logDataVSPrior(const double* dat_0, const double* dat_1,const doub
     #pragma omp atomic
     result+=my_result;
 
-    }   
+ }    
     return result*disturb0;
+
+
 }
+
+
+
+
+// inline double logDataVSPrior2(const double* dat_0, const double* dat_1,const double* pri_0, const double* pri_1, const double* ctf, const double* sigRcp, const int num, const double disturb0)
+// {
+
+//     double result=0.0,temp1,temp2,temp3,temp4;
+//     int i;
+
+//     for(i=0;i<num;i++){
+//         temp1 = (pri_0[i]*ctf[i]);
+//         temp2 = (pri_1[i]*ctf[i]);
+
+//         temp1 = (dat_0[i]-temp1);
+//         temp2 = dat_1[i]-temp2;
+
+//         temp3 = (temp1*temp1+temp2*temp2);
+
+//         result+=(temp3*sigRcp[i]);
+
+//     }
+
+//     return result*disturb0;
+
+// }
