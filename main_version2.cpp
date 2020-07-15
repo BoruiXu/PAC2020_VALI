@@ -154,7 +154,7 @@ inline double logDataVSPrior(const double* dat_0, const double* dat_1,const doub
     int start,end; 
     double my_result=0.0;
     //double *local_my_result = new double[local_num];
-    double local_my_result[local_num];
+    double my_result_array[4];
 
 
 
@@ -164,6 +164,7 @@ inline double logDataVSPrior(const double* dat_0, const double* dat_1,const doub
     
     __m256d m_dat0, m_dat1, m_pri0, m_pri1,m_ctf,m_sigRcp,m1,m2,m3,m4,m5;  
 
+    __m256d local_my_result = _mm256_set_pd(0.0,0.0,0.0,0.0);
     for (i = start; i < end; i+=4)
     {   
 
@@ -183,17 +184,19 @@ inline double logDataVSPrior(const double* dat_0, const double* dat_1,const doub
         m4 = _mm256_mul_pd(m2,m2);
         m3 = _mm256_add_pd(m3,m4);
         m5 = _mm256_mul_pd(m3,m_sigRcp);
-        _mm256_storeu_pd(local_my_result+(i%local_num),m5);
-   
+        local_my_result = _mm256_add_pd(m5,local_my_result);
+    
     }
 
-    _mm256_zeroupper();
+    _mm256_storeu_pd(my_result_array,local_my_result);
+
+    //_mm256_zeroupper();
 
 
 
 
-    for(i=0;i<local_num;i++){
-        my_result+=local_my_result[i];
+    for(i=0;i<4;i++){
+        my_result+=my_result_array[i];
     }
     
     #pragma omp atomic
