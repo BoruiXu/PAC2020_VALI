@@ -10,6 +10,7 @@
 #include <chrono>
 #include <omp.h>
 #include <immintrin.h> 
+#include <malloc.h>
 using namespace std;
 
 // typedef complex<double> Complex;
@@ -20,19 +21,30 @@ const int K=100000; // DO NOT CHANGE!!
 const int local_num = m/8;
 
 inline double logDataVSPrior(const double* dat_0, const double* dat_1,const double* pri_0, const double* pri_1, const double* ctf, const double* sigRcp, const int num, const double disturb0);
-inline double logDataVSPrior2(const double* dat_0, const double* dat_1,const double* pri_0, const double* pri_1, const double* ctf, const double* sigRcp, const int num, const double disturb0);
 
 int main ( int argc, char *argv[] )
 { 
     // Complex *dat = new Complex[m];
     // Complex *pri = new Complex[m];
-    double *dat_0 = new double[m];
-    double *dat_1 = new double[m];
-    double *pri_0 = new double[m];
-    double *pri_1 = new double[m];
-    double *ctf = new double[m];
-    double *sigRcp = new double[m];
+    // double *dat_0 = new double[m];
+    // double *dat_1 = new double[m];
+    // double *pri_0 = new double[m];
+    // double *pri_1 = new double[m];
+    // double *ctf = new double[m];
+    // double *sigRcp = new double[m];
     double *disturb = new double[K];
+
+
+    double* dat_0 = (double*) memalign(32,m*8);
+    double* dat_1 = (double*) memalign(32,m*8);
+    double* pri_0 = (double*) memalign(32,m*8);
+    double* pri_1 = (double*) memalign(32,m*8);
+    double* ctf = (double*) memalign(32,m*8);
+    double* sigRcp = (double*) memalign(32,m*8);
+
+
+
+
     double dat0, dat1, pri0, pri1, ctf0, sigRcp0;
 
     /***************************
@@ -95,7 +107,7 @@ int main ( int argc, char *argv[] )
     }
 
 
-    for(unsigned int t = 0; t < K; t++)
+    for(unsigned int t = 0; t < 100; t++)
     {      
         result = logDataVSPrior(dat_0, dat_1,pri_0, pri_1,ctf, sigRcp, m, disturb[t]);
         fout << t+1 << ": " << result <<"\n";
@@ -108,14 +120,22 @@ int main ( int argc, char *argv[] )
     auto compTime = chrono::duration_cast<chrono::microseconds>(endTime - startTime);
     cout << "Computing time=" << compTime.count() << " microseconds" << endl;
 
-    delete[] dat_0;
-    delete[] pri_0;
+    // delete[] dat_0;
+    // delete[] pri_0;
 
-    delete[] dat_1;
-    delete[] pri_1;
+    // delete[] dat_1;
+    // delete[] pri_1;
 
-    delete[] ctf;
-    delete[] sigRcp;
+    // delete[] ctf;
+    // delete[] sigRcp;
+
+    free((void* )dat_0);
+    free((void* )pri_0);
+    free((void* )dat_1);
+    free((void* )pri_1);
+    free((void* )ctf);
+    free((void* )sigRcp);
+
     delete[] disturb;
     return EXIT_SUCCESS;
 }
@@ -136,6 +156,8 @@ inline double logDataVSPrior(const double* dat_0, const double* dat_1,const doub
     //double *local_my_result = new double[local_num];
     double local_my_result[local_num];
 
+
+
     start = local_num*my_rank;
     end = start+local_num;
     
@@ -145,12 +167,12 @@ inline double logDataVSPrior(const double* dat_0, const double* dat_1,const doub
     for (i = start; i < end; i+=4)
     {   
 
-        m_dat0 = _mm256_loadu_pd(dat_0+i);
-        m_dat1 = _mm256_loadu_pd(dat_1+i);
-        m_pri0 = _mm256_loadu_pd(pri_0+i);
-        m_pri1 = _mm256_loadu_pd(pri_1+i);
-        m_ctf = _mm256_loadu_pd(ctf+i);
-        m_sigRcp = _mm256_loadu_pd(sigRcp+i);
+        m_dat0 = _mm256_load_pd(dat_0+i);
+        m_dat1 = _mm256_load_pd(dat_1+i);
+        m_pri0 = _mm256_load_pd(pri_0+i);
+        m_pri1 = _mm256_load_pd(pri_1+i);
+        m_ctf = _mm256_load_pd(ctf+i);
+        m_sigRcp = _mm256_load_pd(sigRcp+i);
 
             //my_result+= ( norm( dat[i] - ctf[i] * pri[i] ) * sigRcp[i] );
         m1 = _mm256_mul_pd(m_pri0,m_ctf);
@@ -164,6 +186,8 @@ inline double logDataVSPrior(const double* dat_0, const double* dat_1,const doub
         _mm256_storeu_pd(local_my_result+(i%local_num),m5);
    
     }
+
+    _mm256_zeroupper();
 
 
 
@@ -184,25 +208,3 @@ inline double logDataVSPrior(const double* dat_0, const double* dat_1,const doub
 
 
 
-// inline double logDataVSPrior2(const double* dat_0, const double* dat_1,const double* pri_0, const double* pri_1, const double* ctf, const double* sigRcp, const int num, const double disturb0)
-// {
-
-//     double result=0.0,temp1,temp2,temp3,temp4;
-//     int i;
-
-//     for(i=0;i<num;i++){
-//         temp1 = (pri_0[i]*ctf[i]);
-//         temp2 = (pri_1[i]*ctf[i]);
-
-//         temp1 = (dat_0[i]-temp1);
-//         temp2 = dat_1[i]-temp2;
-
-//         temp3 = (temp1*temp1+temp2*temp2);
-
-//         result+=(temp3*sigRcp[i]);
-
-//     }
-
-//     return result*disturb0;
-
-// }
