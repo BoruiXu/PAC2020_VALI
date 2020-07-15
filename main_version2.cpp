@@ -107,7 +107,7 @@ int main ( int argc, char *argv[] )
     }
 
 
-    for(unsigned int t = 0; t < 100; t++)
+    for(unsigned int t = 0; t < K; t++)
     {      
         result = logDataVSPrior(dat_0, dat_1,pri_0, pri_1,ctf, sigRcp, m, disturb[t]);
         fout << t+1 << ": " << result <<"\n";
