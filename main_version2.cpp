@@ -195,9 +195,9 @@ inline double logDataVSPrior(const double* dat_0, const double* dat_1,const doub
 
 
 
-    for(i=0;i<4;i++){
-        my_result+=my_result_array[i];
-    }
+    
+    my_result=(my_result_array[0]+my_result_array[1])+(my_result_array[2]+my_result_array[3]);
+    
     
     #pragma omp atomic
     result+=my_result;
