@@ -37,7 +37,7 @@ int main ( int argc, char *argv[] )
     // memset(final_data,0,sizeof(final_data));
 
     int my_Rank,comm_sz;
-    int source;
+    
     double total_result;
 
     MPI_Init(NULL,NULL);
@@ -58,7 +58,7 @@ int main ( int argc, char *argv[] )
     double* temp_data = new double[local_num];
     memset(temp_data,0,sizeof(temp_data));
 
-    double* final_data = NULL;
+    
 
 
 
