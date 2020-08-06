@@ -56,8 +56,9 @@ int main ( int argc, char *argv[] )
     double* sigRcp = (double*) memalign(32,m*8);
 
     double* temp_data = new double[local_num];
-    memset(temp_data,0,sizeof(temp_data));
-
+   for(int i=0;i<local_num;i++){
+        temp_data[i] = 0;
+    }
     
 
 
